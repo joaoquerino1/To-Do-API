@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lista de Tarefas</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      background: #fff;
+      border-radius: 12px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 520px;
+      height: fit-content;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Formulário */
+    .form-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 1.5rem;
+    }
+
+    .form-row input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-row input:focus { border-color: #4a6cf7; }
+
+    .form-row button {
+      padding: 10px 18px;
+      background: #4a6cf7;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+
+    .form-row button:hover { background: #3a5ce5; }
+
+    /* Lista */
+    #lista-tarefas { list-style: none; }
+
+    .tarefa-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .tarefa-item:last-child { border-bottom: none; }
+
+    /* Checkbox customizado */
+    .tarefa-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #4a6cf7;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .tarefa-titulo {
+      flex: 1;
+      font-size: 14px;
+      color: #1a1a1a;
+      transition: color 0.2s;
+    }
+
+    .tarefa-titulo.concluida {
+      text-decoration: line-through;
+      color: #aaa;
+    }
+
+    .btn-deletar {
+      background: none;
+      border: none;
+      color: #ccc;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+      transition: color 0.2s;
+      flex-shrink: 0;
+    }
+
+    .btn-deletar:hover { color: #e74c3c; }
+
+    /* Estado vazio */
+    .vazio {
+      text-align: center;
+      color: #bbb;
+      font-size: 14px;
+      padding: 2rem 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📝 Lista de Tarefas</h1>
+
+    <div class="form-row">
+      <input type="text" id="input-tarefa" placeholder="Nova tarefa..." />
+      <button onclick="criarTarefa()">Adicionar</button>
+    </div>
+
+    <ul id="lista-tarefas">
+      <li class="vazio">Nenhuma tarefa ainda.</li>
+    </ul>
+  </div>
+
+  <script>
+    // ─── Busca e renderiza todas as tarefas ao carregar a página, e em todas as ações (criar, atualizar, deletar tarefa), renderiza e atualiza a pagina. ───
+    async function listarTarefas() {
+      const res = await fetch('/tarefas');
+      const data = await res.json();
+      renderizarLista(data.tarefas);
+    }
+
+    // ─── Renderiza a lista no DOM ───
+    function renderizarLista(tarefas) {
+  const lista = document.getElementById('lista-tarefas');
+  lista.innerHTML = '';
+
+  if (tarefas.length === 0) {
+    lista.innerHTML = '<li class="vazio">Nenhuma tarefa ainda.</li>';
+    return;
+  }
+
+  tarefas.forEach(t => {
+    const li = document.createElement('li');
+    li.className = 'tarefa-item';
+    li.id = `tarefa-${t.id}`;
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = t.concluida;
+    checkbox.onchange = () => toggleConcluida(t.id, checkbox.checked);
+
+    const span = document.createElement('span');
+    span.className = `tarefa-titulo ${t.concluida ? 'concluida' : ''}`;
+    span.textContent = t.titulo; // textContent é seguro — não interpreta HTML
+
+    const btn = document.createElement('button');
+    btn.className = 'btn-deletar';
+    btn.title = 'Remover';
+    btn.textContent = '×';
+    btn.onclick = () => deletarTarefa(t.id);
+
+    li.append(checkbox, span, btn);
+    lista.appendChild(li);
+  });
+}
+
+    // ─── Cria uma nova tarefa (POST) ───
+    async function criarTarefa() {
+      const input = document.getElementById('input-tarefa');
+      const titulo = input.value.trim();
+
+      if (!titulo) return; // ignora se estiver vazio
+
+      await fetch('/tarefas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ titulo })
+      });
+
+      input.value = '';   // limpa o campo
+      listarTarefas();    // atualiza a lista
+    }
+
+    // ─── Marca/desmarca como concluída (PUT) ───
+    async function toggleConcluida(id, concluida) {
+      await fetch(`/tarefas/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ concluida })
+      });
+
+      listarTarefas(); // atualiza a lista
+    }
+
+    // ─── Deleta uma tarefa (DELETE) ───
+    async function deletarTarefa(id) {
+      await fetch(`/tarefas/${id}`, {
+        method: 'DELETE'
+      });
+
+      listarTarefas(); // atualiza a lista
+    }
+
+    // ─── Permite criar tarefa pressionando Enter ───
+    document.getElementById('input-tarefa').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') criarTarefa();
+    });
+
+    // ─── Carrega as tarefas ao abrir a página ───
+    listarTarefas();
+  </script>
+</body>
+</html>
